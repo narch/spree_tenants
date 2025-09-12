@@ -71,6 +71,66 @@ end
 
 The extension includes migrations that add `store_id` columns to all relevant Spree tables and sets up proper indexes for performance.
 
+## Seeding Data
+
+This extension provides rake tasks to seed tenant-specific data for your stores.
+
+### Available Rake Tasks
+
+```bash
+# Seed global data (countries, states) - run once per environment
+bundle exec rails spree_tenants:seed_global
+
+# Seed all existing stores with basic data
+bundle exec rails spree_tenants:seed_all_stores
+
+# Seed a specific store by ID
+bundle exec rails "spree_tenants:seed_store[1]"
+
+# Seed a specific store by code
+bundle exec rails "spree_tenants:seed_store_by_code[my-store]"
+
+# Create a new store and seed it with basic data
+bundle exec rails "spree_tenants:create_store[Store Name,store-code,store.example.com]"
+```
+
+### What Gets Seeded
+
+For **global data** (shared across all stores):
+- Countries (using Spree's seed data)
+- States/provinces (using Spree's seed data)
+
+For **each store**:
+- Roles (if store-scoped)
+- Shipping categories (Default, Digital)
+- Stock locations with proper addresses
+- Tax categories (Default)
+- Geographic zones based on store's country
+- Store credit categories
+- Reimbursement types
+- Return reasons
+- Basic product taxonomies and taxons
+
+### Production Usage
+
+**Recommended workflow for production:**
+
+```bash
+# 1. First deployment - seed global data once
+RAILS_ENV=production bundle exec rails spree_tenants:seed_global
+
+# 2. Create your first store with data
+RAILS_ENV=production bundle exec rails "spree_tenants:create_store[My Store,my-store,mystore.com]"
+
+# 3. For additional stores
+RAILS_ENV=production bundle exec rails "spree_tenants:create_store[Another Store,another-store,another.com]"
+
+# 4. Or seed existing stores individually
+RAILS_ENV=production bundle exec rails "spree_tenants:seed_store_by_code[existing-store]"
+```
+
+**Note:** Payment methods are not automatically seeded as they are complex and store-specific. Configure them manually through the admin interface based on each store's requirements.
+
 ## Developing
 
 1. Create a dummy app

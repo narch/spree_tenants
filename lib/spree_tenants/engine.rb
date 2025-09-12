@@ -38,6 +38,9 @@ module SpreeTenants
         next if model.abstract_class?
         next if model == Spree::Store # Store is the tenant, not a scoped model
         
+        # Skip global models that should not be tenant-scoped
+        next if ['Spree::Country', 'Spree::State'].include?(model.name)
+        
         # Check if the model has a store_id column
         begin
           if model.table_exists? && model.column_names.include?('store_id')
