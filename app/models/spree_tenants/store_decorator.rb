@@ -2,20 +2,13 @@ module SpreeTenants
   module StoreDecorator
     def self.prepended(base)
       base.class_eval do
-        # Direct associations using store_id
-        has_many :products, foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :variants, through: :products
-        has_many :orders, foreign_key: :store_id, dependent: :restrict_with_error
+        # Additional direct associations using store_id (don't override Spree's existing ones)
         has_many :users, foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :taxonomies, foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :taxons, foreign_key: :store_id, dependent: :restrict_with_error
         has_many :stock_locations, foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :payment_methods, foreign_key: :store_id, dependent: :restrict_with_error
         has_many :shipping_methods, foreign_key: :store_id, dependent: :restrict_with_error
         has_many :zones, foreign_key: :store_id, dependent: :restrict_with_error
         has_many :tax_categories, foreign_key: :store_id, dependent: :restrict_with_error
         has_many :tax_rates, foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :promotions, foreign_key: :store_id, dependent: :restrict_with_error
         
         # Properties and options
         has_many :properties, foreign_key: :store_id, dependent: :restrict_with_error
