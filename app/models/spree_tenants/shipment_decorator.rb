@@ -2,6 +2,8 @@ module SpreeTenants
   module ShipmentDecorator
     def self.prepended(base)
       base.class_eval do
+        include SpreeTenants::StoreIdInheritance
+        
         # Shipment numbers should be globally unique (not per-store)
         # This is intentional - shipment numbers should be unique across all stores
         # for tracking, customer service, and logistics purposes
