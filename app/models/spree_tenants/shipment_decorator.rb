@@ -10,6 +10,9 @@ module SpreeTenants
         def self.spree_base_uniqueness_scope
           [:store_id]
         end
+
+        # Inherit store_id from order
+        inherit_store_id_from :order
       end
     end
   end
