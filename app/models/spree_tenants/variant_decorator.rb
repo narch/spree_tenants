@@ -2,22 +2,6 @@ module SpreeTenants
   module VariantDecorator
     def self.prepended(base)
       base.class_eval do
-        # Remove the original SKU validation from Spree
-        _validators.delete(:sku)
-        _validate_callbacks.each do |callback|
-          if callback.filter.respond_to?(:attributes) && callback.filter.attributes == [:sku]
-            _validate_callbacks.delete(callback)
-          end
-        end
-        
-        # Add our store-scoped SKU validation
-        # This ensures SKU uniqueness within each store
-        validates :sku, uniqueness: { 
-          scope: :store_id, 
-          allow_blank: true,
-          case_sensitive: false 
-        }
-        
         # Ensure variant inherits store_id from product
         # This is needed because master variant might be created before acts_as_tenant sets it
         before_validation :inherit_store_from_product
