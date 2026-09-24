@@ -33,10 +33,14 @@ module SpreeTenants
       app.config.importmap.cache_sweepers << root.join('app/javascript')
     end
 
-    def self.activate
-      SpreeTenants::TenantScoping.activate!
-    end
+    # Boot-time activation runs after_initialize so that engine locale files
+    # are loaded first (Spree.t evaluated in class bodies would otherwise
+    # capture "translation missing" markup). to_prepare only re-runs it on
+    # code reloads in development.
+    config.after_initialize { SpreeTenants::TenantScoping.activate! }
 
-    config.to_prepare(&method(:activate).to_proc)
+    config.to_prepare do
+      SpreeTenants::TenantScoping.activate! if Rails.application.initialized?
+    end
   end
 end
