@@ -54,9 +54,22 @@ RSpec.describe Spree::Store, type: :model do
       expect(association.options[:through]).to eq(:store_products)
     end
 
-    it 'keeps Spree has_many :through chains valid' do
-      %i[variants product_properties line_items shipments payments stock_items].each do |name|
-        expect { Spree::Store.reflect_on_association(name).check_validity! }.not_to raise_error
+    it 'keeps every Store association valid (through chains depend on definition order)' do
+      Spree::Store.reflect_on_all_associations.each do |reflection|
+        expect { reflection.check_validity! }.not_to raise_error, "Spree::Store##{reflection.name}"
+      end
+    end
+
+    it 'keeps every association on scoped models valid' do
+      # Spree's own optional Vendor and polymorphic-through theme link are excluded.
+      known = ['Spree::Export#vendor', 'Spree::PageLink#theme']
+
+      SpreeTenants::TenantScoping.scoped_models.each do |model|
+        model.reflect_on_all_associations.each do |reflection|
+          next if known.include?("#{model.name}##{reflection.name}")
+
+          expect { reflection.check_validity! }.not_to raise_error, "#{model.name}##{reflection.name}"
+        end
       end
     end
     
