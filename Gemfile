@@ -7,7 +7,8 @@ end
 
 gem 'rails-controller-testing'
 
-spree_opts = { github: 'spree/spree', branch: 'main' }
+# Pinned to the version the host app (tcb) runs in production.
+spree_opts = '5.1.6'
 gem 'spree', spree_opts
 gem 'spree_admin', spree_opts
 gem 'spree_emails', spree_opts
