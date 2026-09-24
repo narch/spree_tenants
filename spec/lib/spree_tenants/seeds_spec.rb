@@ -39,6 +39,23 @@ RSpec.describe SpreeTenants::Seeds do
       expect(store_scoped_counts(first)).to eq(store_scoped_counts(second))
     end
 
+    it 'promotes an existing location and tax category when the store lost its defaults' do
+      store = quietly { described_class.create_store!(name: 'First', code: 'first', url: 'first.example.com') }
+      ActsAsTenant.without_tenant do
+        Spree::StockLocation.where(store_id: store.id).update_all(default: false)
+        Spree::TaxCategory.where(store_id: store.id).update_all(is_default: false)
+      end
+
+      expect { quietly { described_class.seed_store(store) } }.not_to raise_error
+
+      ActsAsTenant.with_tenant(store) do
+        expect(Spree::StockLocation.count).to eq(1)
+        expect(Spree::StockLocation.first).to be_default
+        expect(Spree::TaxCategory.where(name: 'Default').count).to eq(1)
+        expect(Spree::TaxCategory.find_by(name: 'Default')).to be_is_default
+      end
+    end
+
     it 'is idempotent' do
       store = quietly { described_class.create_store!(name: 'First', code: 'first', url: 'first.example.com') }
       before = store_scoped_counts(store)

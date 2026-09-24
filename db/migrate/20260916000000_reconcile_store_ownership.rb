@@ -187,7 +187,18 @@ class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
       change_column_default table, :store_id, from: nil, to: 1
     end
 
-    change_column_null :spree_payment_methods, :store_id, false if store_id_column?(:spree_payment_methods)
+    if store_id_column?(:spree_payment_methods) && table_exists?(:spree_payment_methods_stores)
+      execute <<~SQL.squish
+        UPDATE spree_payment_methods SET store_id = (
+          SELECT MIN(store_id) FROM spree_payment_methods_stores
+          WHERE spree_payment_methods_stores.payment_method_id = spree_payment_methods.id
+        ) WHERE store_id IS NULL
+      SQL
+      leftovers = select_value('SELECT COUNT(*) FROM spree_payment_methods WHERE store_id IS NULL').to_i
+      raise ActiveRecord::MigrationError, "#{leftovers} payment methods belong to no store; assign one before rolling back" if leftovers.positive?
+
+      change_column_null :spree_payment_methods, :store_id, false
+    end
 
     # Global name/email indexes are not restored (per-store duplicates may
     # exist); the join-table backfill is not undone.

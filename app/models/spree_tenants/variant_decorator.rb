@@ -2,7 +2,10 @@ module SpreeTenants
   module VariantDecorator
     def self.prepended(base)
       base.class_eval do
-        before_validation :inherit_store_from_product
+        include SpreeTenants::StoreIdInheritance
+
+        # Inherits store_id from the product and validates they match.
+        inherit_store_id_from :product
 
         # Replace Spree's global SKU uniqueness with a store-scoped one.
         sku_uniqueness = _validate_callbacks.select do |callback|
@@ -21,12 +24,6 @@ module SpreeTenants
         validate :option_values_belong_to_same_store
 
         private
-
-        def inherit_store_from_product
-          if store_id.blank? && product&.store_id.present?
-            self.store_id = product.store_id
-          end
-        end
 
         def option_values_belong_to_same_store
           return unless store_id.present?

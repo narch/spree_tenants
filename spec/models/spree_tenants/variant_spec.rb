@@ -125,6 +125,20 @@ RSpec.describe Spree::Variant, type: :model do
     end
   end
   
+  describe 'product reassignment' do
+    it 'refuses a product from another store' do
+      product = ActsAsTenant.with_tenant(store) { create(:product) }
+      other_product = ActsAsTenant.with_tenant(another_store) { create(:product) }
+
+      ActsAsTenant.without_tenant do
+        variant = product.master
+        variant.product = other_product
+        expect(variant).not_to be_valid
+        expect(variant.errors[:product]).to include('must belong to the same store')
+      end
+    end
+  end
+
   describe 'master variant' do
     it 'inherits store_id from product' do
       ActsAsTenant.with_tenant(store) do

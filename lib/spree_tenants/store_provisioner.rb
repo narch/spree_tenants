@@ -104,24 +104,31 @@ module SpreeTenants
       Spree::ShippingCategory.find_or_create_by!(name: 'Digital', store_id: store.id)
     end
 
+    # Promotes an existing location of the standard name if the store has no
+    # default (Spree used to clear the flag across all stores).
     def create_stock_location
       return if Spree::StockLocation.where(store_id: store.id, default: true).exists?
 
-      Spree::StockLocation.create!(
-        name: Spree.t(:default_stock_location_name),
-        store_id: store.id,
-        default: true,
-        active: true,
-        propagate_all_variants: false,
-        country: store.default_country,
-        state: store.default_country&.states&.first
-      )
+      location = Spree::StockLocation.find_or_initialize_by(name: Spree.t(:default_stock_location_name), store_id: store.id)
+      if location.new_record?
+        location.assign_attributes(
+          propagate_all_variants: false,
+          country: store.default_country,
+          state: store.default_country&.states&.first
+        )
+      end
+      location.default = true
+      location.active = true
+      location.save!
     end
 
     def create_tax_categories
-      Spree::TaxCategory.find_or_create_by!(name: 'Default', store_id: store.id) do |tax_category|
+      default = Spree::TaxCategory.find_or_create_by!(name: 'Default', store_id: store.id) do |tax_category|
         tax_category.is_default = true
         tax_category.description = 'Default tax category'
+      end
+      unless Spree::TaxCategory.where(store_id: store.id, is_default: true).exists?
+        default.update!(is_default: true)
       end
       Spree::TaxCategory.find_or_create_by!(name: 'Non-taxable', store_id: store.id)
     end
