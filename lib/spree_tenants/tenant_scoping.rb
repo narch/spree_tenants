@@ -96,9 +96,12 @@ module SpreeTenants
 
       private
 
+      # Through Zeitwerk, so files load once per (re)load and constants are
+      # never redefined.
       def load_decorators
-        Dir.glob(SpreeTenants::Engine.root.join('app/**/*_decorator*.rb')) do |file|
-          Rails.application.config.enable_reloading ? load(file) : require(file)
+        loader = Rails.autoloaders.main
+        Dir.glob(SpreeTenants::Engine.root.join('app/*')).each do |dir|
+          loader.eager_load_dir(dir) if loader.dirs.include?(dir)
         end
       end
 
