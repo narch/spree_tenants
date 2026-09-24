@@ -149,9 +149,16 @@ RSpec.describe Spree::Product, type: :model do
       
       it 'prevents taxons from different stores' do
         ActsAsTenant.without_tenant do
-          product.taxons << another_store_taxon
-          expect(product).not_to be_valid
-          expect(product.errors[:taxons]).to include('must belong to the same store as the product')
+          new_product = build(:product, store_id: store.id, taxons: [another_store_taxon])
+          expect(new_product).not_to be_valid
+          expect(new_product.errors[:taxons]).to include('must belong to the same store as the product')
+        end
+      end
+
+      it 'refuses to persist a classification bridging two stores' do
+        ActsAsTenant.without_tenant do
+          expect { product.taxons << another_store_taxon }.to raise_error(ActiveRecord::RecordInvalid, /same store/)
+          expect(product.reload.taxons).to be_empty
         end
       end
     end

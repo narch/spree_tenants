@@ -137,7 +137,8 @@ RSpec.describe Spree::Order, type: :model do
         # Create payment method with simple setup
         payment_method = Spree::PaymentMethod::Check.create!(
           name: 'Check',
-          active: true
+          active: true,
+          stores: [store]
         )
         
         # Create payment without validation to test store_id assignment
@@ -149,8 +150,8 @@ RSpec.describe Spree::Order, type: :model do
         payment.save!(validate: false)
         
         expect(payment.store_id).to eq(store.id)
-        # Payment method gets store_id through acts_as_tenant
-        expect(payment_method.store_id).to eq(store.id)
+        # Payment methods keep Spree's native store ownership
+        expect(payment_method.stores).to eq([store])
       end
     end
 

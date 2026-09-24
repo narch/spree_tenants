@@ -26,8 +26,9 @@ RSpec.describe Spree::Payment, type: :model do
       ActsAsTenant.with_tenant(store) do
         order = create(:order, total: 50.00)
         payment_method = Spree::PaymentMethod::Check.create!(
-          name: 'Check', 
-          active: true
+          name: 'Check',
+          active: true,
+          stores: [store]
         )
         
         payment = order.payments.build(
@@ -40,7 +41,7 @@ RSpec.describe Spree::Payment, type: :model do
         expect(payment).to be_persisted
         expect(payment.store_id).to eq(store.id)
         expect(payment.order.store_id).to eq(store.id)
-        expect(payment.payment_method.store_id).to eq(store.id)
+        expect(payment.payment_method.stores).to include(store)
       end
     end
 
@@ -117,7 +118,8 @@ RSpec.describe Spree::Payment, type: :model do
         order = create(:order, total: 100.00)
         payment_method = Spree::PaymentMethod::Check.create!(
           name: 'Check',
-          active: true
+          active: true,
+          stores: [store]
         )
         
         payment = order.payments.build(
@@ -128,8 +130,9 @@ RSpec.describe Spree::Payment, type: :model do
         payment.save!(validate: false)
         
         expect(payment.order.store_id).to eq(store.id)
-        expect(payment.payment_method.store_id).to eq(store.id)
-        expect([payment.store_id, payment.order.store_id, payment.payment_method.store_id].uniq.size).to eq(1)
+        expect(payment.payment_method.available_for_store?(store)).to be true
+        expect(payment.payment_method.available_for_store?(another_store)).to be false
+        expect(payment.store_id).to eq(payment.order.store_id)
       end
     end
   end
@@ -238,22 +241,20 @@ RSpec.describe Spree::Payment, type: :model do
 
   describe 'payment methods' do
     it 'uses payment methods from same store only' do
-      method1 = ActsAsTenant.with_tenant(store) do
-        Spree::PaymentMethod::Check.create!(
-          name: 'Store 1 Check',
-          active: true
-        )
-      end
-      
-      method2 = ActsAsTenant.with_tenant(another_store) do
-        Spree::PaymentMethod::Check.create!(
-          name: 'Store 2 Check',
-          active: true
-        )
-      end
-      
+      method1 = Spree::PaymentMethod::Check.create!(
+        name: 'Store 1 Check',
+        active: true,
+        stores: [store]
+      )
+
+      method2 = Spree::PaymentMethod::Check.create!(
+        name: 'Store 2 Check',
+        active: true,
+        stores: [another_store]
+      )
+
       ActsAsTenant.with_tenant(store) do
-        methods = Spree::PaymentMethod.all
+        methods = store.payment_methods
         expect(methods).to include(method1)
         expect(methods).not_to include(method2)
         
@@ -288,8 +289,10 @@ RSpec.describe Spree::Payment, type: :model do
           active: false
         )
         
-        active_methods = Spree::PaymentMethod.where(active: true)
-        expect(active_methods.count).to eq(2)
+        # Payment methods are Spree-native: read them through the store. The
+        # provisioned Store Credit method is there too.
+        active_methods = store.payment_methods.where(active: true)
+        expect(active_methods.where.not(type: 'Spree::PaymentMethod::StoreCredit').count).to eq(2)
         expect(active_methods).to include(credit_card, check)
         expect(active_methods).not_to include(inactive)
       end

@@ -41,14 +41,17 @@ RSpec.describe Spree::Zone, type: :model do
         )
       end
       
+      # Each store also has the zone provisioned for its default country.
       ActsAsTenant.with_tenant(store) do
-        expect(Spree::Zone.count).to eq(1)
-        expect(Spree::Zone.first.name).to eq('North America')
+        expect(Spree::Zone.pluck(:name)).to include('North America')
+        expect(Spree::Zone.pluck(:name)).not_to include('Europe')
+        expect(Spree::Zone.pluck(:store_id).uniq).to eq([store.id])
       end
       
       ActsAsTenant.with_tenant(another_store) do
-        expect(Spree::Zone.count).to eq(1)
-        expect(Spree::Zone.first.name).to eq('Europe')
+        expect(Spree::Zone.pluck(:name)).to include('Europe')
+        expect(Spree::Zone.pluck(:name)).not_to include('North America')
+        expect(Spree::Zone.pluck(:store_id).uniq).to eq([another_store.id])
       end
     end
   end

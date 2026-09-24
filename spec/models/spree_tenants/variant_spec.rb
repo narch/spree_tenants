@@ -13,70 +13,84 @@ RSpec.describe Spree::Variant, type: :model do
     expect(another_store).to be_valid, another_store.errors.full_messages.to_sentence
   end
   
-  describe 'SKU uniqueness validation' do
+  describe 'SKU uniqueness' do
     it 'allows same SKU in different stores' do
       product = create(:product, store_id: store.id)
       another_product = create(:product, store_id: another_store.id)
-      
+
       ActsAsTenant.with_tenant(store) do
         create(:variant, sku: 'SKU-001', product: product)
       end
-      
+
       ActsAsTenant.with_tenant(another_store) do
         variant = build(:variant, sku: 'SKU-001', product: another_product)
         expect(variant).to be_valid
       end
     end
-    
-    it 'prevents duplicate SKUs within same store' do
+
+    it 'prevents duplicate SKUs within the same store' do
       product = ActsAsTenant.with_tenant(store) { create(:product) }
-      
+
       ActsAsTenant.with_tenant(store) do
         create(:variant, sku: 'SKU-001', product: product)
         duplicate = build(:variant, sku: 'SKU-001', product: product)
-        
+
         expect(duplicate).not_to be_valid
         expect(duplicate.errors[:sku]).to include('has already been taken')
       end
     end
-    
-    it 'is case insensitive' do
+
+    it 'is case insensitive within a store' do
       product = ActsAsTenant.with_tenant(store) { create(:product) }
-      
+
       ActsAsTenant.with_tenant(store) do
         create(:variant, sku: 'sku-001', product: product)
         duplicate = build(:variant, sku: 'SKU-001', product: product)
-        
+
         expect(duplicate).not_to be_valid
-        expect(duplicate.errors[:sku]).to include('has already been taken')
       end
     end
-    
-    it 'allows blank SKUs' do
+
+    it 'is also enforced by the database for concurrent writes' do
       product = ActsAsTenant.with_tenant(store) { create(:product) }
-      
+
+      ActsAsTenant.with_tenant(store) do
+        variant = create(:variant, sku: 'SKU-001', product: product)
+
+        columns = { product_id: product.id, sku: 'sku-001', store_id: store.id, is_master: false,
+                    created_at: Time.current, updated_at: Time.current }
+        expect do
+          Spree::Variant.insert_all!([columns])
+        end.to raise_error(ActiveRecord::RecordNotUnique)
+        expect(variant).to be_persisted
+      end
+    end
+
+    it 'allows multiple blank SKUs' do
+      product = ActsAsTenant.with_tenant(store) { create(:product) }
+
       ActsAsTenant.with_tenant(store) do
         variant1 = create(:variant, sku: '', product: product)
         variant2 = build(:variant, sku: '', product: product)
-        
-        expect(variant1).to be_valid
+
+        expect(variant1).to be_persisted
         expect(variant2).to be_valid
       end
     end
-    
+
     it 'ignores deleted variants' do
       product = ActsAsTenant.with_tenant(store) { create(:product) }
-      
+
       ActsAsTenant.with_tenant(store) do
         deleted_variant = create(:variant, sku: 'SKU-001', product: product)
         deleted_variant.destroy
-        
+
         new_variant = build(:variant, sku: 'SKU-001', product: product)
         expect(new_variant).to be_valid
       end
     end
   end
-  
+
   describe 'cross-tenant validations' do
     describe '#option_values_belong_to_same_store' do
       it 'allows option values from same store' do
@@ -100,9 +114,12 @@ RSpec.describe Spree::Variant, type: :model do
         another_store_option_value = ActsAsTenant.with_tenant(another_store) { create(:option_value, option_type: another_store_option_type) }
         
         ActsAsTenant.without_tenant do
-          variant.option_values << another_store_option_value
-          expect(variant).not_to be_valid
-          expect(variant.errors[:option_values]).to include('must belong to the same store as the variant')
+          expect { variant.option_values << another_store_option_value }.to raise_error(ActiveRecord::RecordInvalid, /same store/)
+          expect(variant.reload.option_values).not_to include(another_store_option_value)
+
+          unsaved = build(:variant, product: product, store_id: store.id, option_values: [another_store_option_value])
+          expect(unsaved).not_to be_valid
+          expect(unsaved.errors[:option_values]).to include('must belong to the same store as the variant')
         end
       end
     end

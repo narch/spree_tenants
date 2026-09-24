@@ -51,14 +51,17 @@ RSpec.describe Spree::ShippingMethod, type: :model do
         )
       end
       
+      # Each store also has its provisioned Digital Delivery method.
       ActsAsTenant.with_tenant(store) do
-        expect(Spree::ShippingMethod.count).to eq(1)
-        expect(Spree::ShippingMethod.first.name).to eq('Standard Shipping')
+        expect(Spree::ShippingMethod.pluck(:name)).to include('Standard Shipping')
+        expect(Spree::ShippingMethod.pluck(:name)).not_to include('Express Shipping')
+        expect(Spree::ShippingMethod.pluck(:store_id).uniq).to eq([store.id])
       end
       
       ActsAsTenant.with_tenant(another_store) do
-        expect(Spree::ShippingMethod.count).to eq(1)
-        expect(Spree::ShippingMethod.first.name).to eq('Express Shipping')
+        expect(Spree::ShippingMethod.pluck(:name)).to include('Express Shipping')
+        expect(Spree::ShippingMethod.pluck(:name)).not_to include('Standard Shipping')
+        expect(Spree::ShippingMethod.pluck(:store_id).uniq).to eq([another_store.id])
       end
     end
   end
