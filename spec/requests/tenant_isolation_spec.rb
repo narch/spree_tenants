@@ -4,10 +4,10 @@ RSpec.describe 'Tenant isolation across stores', type: :request do
   include_context 'multi_tenant_setup'
 
   let!(:store_product) do
-    ActsAsTenant.with_tenant(store) { create(:product, name: 'Store One Widget', price: 10) }
+    ActsAsTenant.with_tenant(store) { create(:product_in_stock, name: 'Store One Widget', price: 10) }
   end
   let!(:other_product) do
-    ActsAsTenant.with_tenant(another_store) { create(:product, name: 'Store Two Gadget', price: 10) }
+    ActsAsTenant.with_tenant(another_store) { create(:product_in_stock, name: 'Store Two Gadget', price: 10) }
   end
 
   before do
@@ -45,6 +45,19 @@ RSpec.describe 'Tenant isolation across stores', type: :request do
       host! 'store1.example.com'
       get "/products/#{other_product.slug}"
 
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe 'cart' do
+    it 'adds the current store variant and refuses another store variant' do
+      host! 'store1.example.com'
+
+      post '/line_items', params: { variant_id: store_product.master.id, quantity: 1 }
+      expect(response.status).to be_between(200, 302), response.body
+      expect(Spree::Order.unscoped.last.line_items.map(&:variant_id)).to eq([store_product.master.id])
+
+      post '/line_items', params: { variant_id: other_product.master.id, quantity: 1 }
       expect(response).to have_http_status(:not_found)
     end
   end

@@ -49,11 +49,15 @@ RSpec.describe Spree::Store, type: :model do
   end
   
   describe 'associations' do
-    it 'has many products' do
+    it 'keeps Spree products association, fed by the mirrored join rows' do
       association = Spree::Store.reflect_on_association(:products)
-      expect(association).to be_present
-      expect(association.macro).to eq(:has_many)
-      expect(association.options[:foreign_key]).to eq(:store_id)
+      expect(association.options[:through]).to eq(:store_products)
+    end
+
+    it 'keeps Spree has_many :through chains valid' do
+      %i[variants product_properties line_items shipments payments stock_items].each do |name|
+        expect { Spree::Store.reflect_on_association(name).check_validity! }.not_to raise_error
+      end
     end
     
     it 'has many orders' do

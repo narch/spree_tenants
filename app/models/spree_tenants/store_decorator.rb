@@ -2,10 +2,11 @@ module SpreeTenants
   module StoreDecorator
     def self.prepended(base)
       base.class_eval do
-        # Direct ownership; the Spree join tables are mirrored from store_id.
-        has_many :products, class_name: 'Spree::Product', foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :promotions, class_name: 'Spree::Promotion', foreign_key: :store_id, dependent: :restrict_with_error
-        has_many :orders, class_name: 'Spree::Order', dependent: :restrict_with_error
+        # Spree's products, promotions and orders associations are left as
+        # defined: redefining them would reorder the reflections Spree's
+        # has_many :through chains depend on. The mirrored join rows keep
+        # products and promotions correct.
+        before_destroy :prevent_destroy_with_owned_records
 
         # Spree's Store#users means staff; customers live here.
         if (user_class = Spree.user_class(constantize: false)).present?
@@ -106,6 +107,17 @@ module SpreeTenants
 
     def provision_tenant_records
       SpreeTenants::StoreProvisioner.call(self)
+    end
+
+    def prevent_destroy_with_owned_records
+      ActsAsTenant.without_tenant do
+        { products: Spree::Product, orders: Spree::Order, promotions: Spree::Promotion }.each do |name, klass|
+          next unless klass.where(store_id: id).exists?
+
+          errors.add(:base, "Cannot delete record because dependent #{name} exist")
+          throw :abort
+        end
+      end
     end
 
     def import_products_from_store_unsupported

@@ -12,12 +12,12 @@ RSpec.describe SpreeTenants::DirectStoreOwnership do
       expect(product.stores).to eq([store])
     end
 
-    it 'treats store_id as authoritative even if a stray join row exists' do
+    it 'refuses a join row pointing at another store' do
       product = ActsAsTenant.with_tenant(store) { create(:product) }
-      Spree::StoreProduct.create!(product: product, store: another_store)
 
+      expect { Spree::StoreProduct.create!(product: product, store: another_store) }
+        .to raise_error(ActiveRecord::RecordInvalid, /must be the product store/)
       ActsAsTenant.without_tenant do
-        expect(product.store_ids).to eq([store.id])
         expect(Spree::Product.for_store(another_store)).not_to include(product)
         expect(another_store.products).not_to include(product)
       end
@@ -62,6 +62,13 @@ RSpec.describe SpreeTenants::DirectStoreOwnership do
   end
 
   describe 'Spree::Promotion' do
+    it 'refuses a join row pointing at another store' do
+      promotion = ActsAsTenant.with_tenant(store) { Spree::Promotion.create!(name: 'Ten off', code: 'TEN') }
+
+      expect { Spree::StorePromotion.create!(promotion: promotion, store: another_store) }
+        .to raise_error(ActiveRecord::RecordInvalid, /must be the promotion store/)
+    end
+
     it 'mirrors store_id into spree_promotions_stores' do
       promotion = ActsAsTenant.with_tenant(store) { Spree::Promotion.create!(name: 'Ten off', code: 'TEN') }
 

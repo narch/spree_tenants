@@ -11,6 +11,7 @@ module SpreeTenants
 
         scope :for_store, ->(store) { where(store_id: store.id) }
 
+        before_validation :drop_foreign_store_join_rows
         after_save :sync_store_join_rows, if: :saved_change_to_store_id?
         validate :requested_store_ids_match_owner
         after_save { @requested_store_ids = nil }
@@ -38,6 +39,16 @@ module SpreeTenants
     end
 
     private
+
+    # Spree code and factories assign `stores` directly; the join rows are
+    # derived from store_id, so in-memory rows for other stores are dropped.
+    def drop_foreign_store_join_rows
+      owner = store_id || ActsAsTenant.current_tenant&.id
+      return unless owner
+
+      association(:stores).target.delete_if { |s| s.id != owner }
+      association(self.class.store_join_association).target.delete_if { |row| row.store_id != owner }
+    end
 
     def requested_store_ids_match_owner
       return if @requested_store_ids.nil? || @requested_store_ids.empty?
