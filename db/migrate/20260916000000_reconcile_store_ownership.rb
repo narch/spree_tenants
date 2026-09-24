@@ -170,6 +170,8 @@ class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
   end
 
   def down
+    ensure_payment_methods_reducible_to_one_store!
+
     remove_index :spree_variants, name: SKU_INDEX, if_exists: true if table_exists?(:spree_variants)
     remove_column :spree_invitations, :store_id if table_exists?(:spree_invitations) && column_exists?(:spree_invitations, :store_id)
 
@@ -194,8 +196,6 @@ class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
           WHERE spree_payment_methods_stores.payment_method_id = spree_payment_methods.id
         ) WHERE store_id IS NULL
       SQL
-      leftovers = select_value('SELECT COUNT(*) FROM spree_payment_methods WHERE store_id IS NULL').to_i
-      raise ActiveRecord::MigrationError, "#{leftovers} payment methods belong to no store; assign one before rolling back" if leftovers.positive?
 
       change_column_null :spree_payment_methods, :store_id, false
     end
@@ -205,6 +205,26 @@ class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
   end
 
   private
+
+  # Rolling back returns payment methods to single-store ownership; refuse
+  # while any method is unassigned or shared.
+  def ensure_payment_methods_reducible_to_one_store!
+    return unless store_id_column?(:spree_payment_methods) && table_exists?(:spree_payment_methods_stores)
+
+    ambiguous = select_value(<<~SQL.squish).to_i
+      SELECT COUNT(*) FROM spree_payment_methods pm
+      WHERE pm.store_id IS NULL
+        AND (
+          SELECT COUNT(DISTINCT pms.store_id)
+          FROM spree_payment_methods_stores pms
+          WHERE pms.payment_method_id = pm.id
+        ) <> 1
+    SQL
+    return unless ambiguous.positive?
+
+    raise ActiveRecord::IrreversibleMigration,
+          "#{ambiguous} payment methods cannot be reduced to one store; assign unassigned methods or split shared methods before rolling back"
+  end
 
   def store_id_column?(table)
     table_exists?(table) && column_exists?(table, :store_id)
