@@ -2,28 +2,44 @@ module SpreeTenants
   module VariantDecorator
     def self.prepended(base)
       base.class_eval do
-        # Ensure variant inherits store_id from product
-        # This is needed because master variant might be created before acts_as_tenant sets it
         before_validation :inherit_store_from_product
-        
-        # Validate option values belong to same store
-        # Even with acts_as_tenant, we can still have invalid associations in tests or edge cases
+
+        # Replace Spree's global SKU uniqueness with a store-scoped one.
+        sku_uniqueness = _validate_callbacks.select do |callback|
+          callback.filter.is_a?(ActiveRecord::Validations::UniquenessValidator) &&
+            callback.filter.attributes == [:sku]
+        end
+        sku_uniqueness.each { |callback| _validate_callbacks.delete(callback) }
+        _validators[:sku]&.reject! { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
+
+        validates :sku, uniqueness: {
+          scope: :store_id,
+          conditions: -> { where(deleted_at: nil) },
+          case_sensitive: false
+        }, allow_blank: true, unless: :disable_sku_validation?
+
         validate :option_values_belong_to_same_store
-        
+
         private
-        
+
         def inherit_store_from_product
           if store_id.blank? && product&.store_id.present?
             self.store_id = product.store_id
           end
         end
-        
+
         def option_values_belong_to_same_store
           return unless store_id.present?
-          
-          invalid_option_values = option_values.select { |ov| ov.store_id.present? && ov.store_id != store_id }
-          if invalid_option_values.any?
-            errors.add(:option_values, "must belong to the same store as the variant")
+
+          in_memory = association(:option_values).target + association(:option_value_variants).target.map(&:option_value)
+          foreign = in_memory.compact.any? { |ov| ov.store_id.present? && ov.store_id != store_id }
+          errors.add(:option_values, 'must belong to the same store as the variant') if foreign
+        end
+
+        # Only propagate into this store's stock locations.
+        def create_stock_items
+          Spree::StockLocation.where(propagate_all_variants: true, store_id: store_id).each do |stock_location|
+            stock_location.propagate_variant(self)
           end
         end
       end

@@ -1,13 +1,13 @@
 module SpreeTenants
-  module PageSectionDecorator
+  module PageBlockDecorator
     def self.prepended(base)
       base.class_eval do
         include SpreeTenants::StoreIdInheritance
 
-        inherit_store_id_from :pageable
+        inherit_store_id_from :section
       end
     end
   end
 end
 
-Spree::PageSection.prepend(SpreeTenants::PageSectionDecorator)
+Spree::PageBlock.prepend(SpreeTenants::PageBlockDecorator)
