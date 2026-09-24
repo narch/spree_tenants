@@ -56,6 +56,12 @@ RSpec.describe SpreeTenants::Seeds do
       end
     end
 
+    it 'derives a valid mail-from address from a url with a port' do
+      store = quietly { described_class.create_store!(name: 'Local', code: 'local', url: 'second.lvh.me:3000') }
+
+      expect(store.mail_from_address).to eq('noreply@second.lvh.me')
+    end
+
     it 'is idempotent' do
       store = quietly { described_class.create_store!(name: 'First', code: 'first', url: 'first.example.com') }
       before = store_scoped_counts(store)

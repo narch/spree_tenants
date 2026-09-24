@@ -64,20 +64,20 @@ namespace :spree_tenants do
   end
 
   desc 'Create a new store with basic data (atomic: nothing is left behind if seeding fails)'
-  task :create_store, [:name, :code, :url] => :environment do |_task, args|
+  task :create_store, [:name, :code, :url, :mail_from_address] => :environment do |_task, args|
     require_relative '../spree_tenants/engine'
     require_relative '../../db/seeds'
 
-    name = args[:name]
-    code = args[:code]
-    url = args[:url]
+    name, code, url, mail_from_address = args.values_at(:name, :code, :url, :mail_from_address)
 
     if [name, code, url].any?(&:blank?)
-      puts 'Usage: rake spree_tenants:create_store["Store Name","store-code","store.example.com"]'
+      puts 'Usage: rake spree_tenants:create_store["Store Name","store-code","store.example.com"[,"orders@store.example.com"]]'
       exit 1
     end
 
-    store = SpreeTenants::Seeds.create_store!(name: name, code: code, url: url)
+    options = { name: name, code: code, url: url }
+    options[:mail_from_address] = mail_from_address if mail_from_address.present?
+    store = SpreeTenants::Seeds.create_store!(**options)
 
     puts 'Store created and seeded successfully!'
     puts "Store ID: #{store.id}"

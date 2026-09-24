@@ -13,7 +13,7 @@ module SpreeTenants
                 name: name,
                 code: code,
                 url: url,
-                mail_from_address: "noreply@#{url}",
+                mail_from_address: "noreply@#{url.split(':').first}",
                 default_country: Spree::Country.find_by(iso: 'US') || Spree::Country.first,
                 default_currency: 'USD'
               }.merge(attributes)
