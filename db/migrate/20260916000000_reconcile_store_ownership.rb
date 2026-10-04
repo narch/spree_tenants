@@ -7,6 +7,10 @@
 #
 # Requires PostgreSQL or SQLite (expression and partial indexes).
 class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
+  # Keep the many schema changes individually committed so the migration is
+  # restartable on managed databases if a DDL operation interrupts the run.
+  disable_ddl_transaction!
+
   SUPPORTED_ADAPTERS = %w[PostgreSQL SQLite].freeze
 
   DEFAULTED_TABLES = %i[
@@ -116,11 +120,9 @@ class ReconcileStoreOwnership < ActiveRecord::Migration[8.0]
     CASE_INSENSITIVE_NAME_TABLES.each { |table| add_case_insensitive_name_index(table) }
 
     if table_exists?(:spree_invitations)
-      unless column_exists?(:spree_invitations, :store_id)
-        add_column :spree_invitations, :store_id, :bigint
-        add_index :spree_invitations, :store_id
-        add_foreign_key :spree_invitations, :spree_stores, column: :store_id
-      end
+      add_column :spree_invitations, :store_id, :bigint unless column_exists?(:spree_invitations, :store_id)
+      add_index :spree_invitations, :store_id, if_not_exists: true
+      add_foreign_key :spree_invitations, :spree_stores, column: :store_id unless foreign_key_exists?(:spree_invitations, :spree_stores, column: :store_id)
 
       execute <<~SQL.squish
         UPDATE spree_invitations SET store_id = resource_id WHERE resource_type = 'Spree::Store' AND store_id IS NULL
