@@ -17,6 +17,15 @@ module SpreeTenants
         inherit_store_id_from :order
       end
     end
+
+    # Keep ResourceController#ensure_current_store safe if a shipment is ever
+    # initialized before being attached to its order.
+    def store
+      return super if order.present?
+      return if store_id.blank?
+
+      Spree::Store.unscoped.find_by(id: store_id)
+    end
   end
 end
 
